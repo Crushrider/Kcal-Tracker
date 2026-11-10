@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getWithingsToken,
+  getGoogleFitToken,
+  buildAuthUrl,
   exchangeCode,
-  fetchLatestMeasures,
-  measuresToWeights
-} from '../lib/withings.js';
+  getValidToken,
+  fetchWeights
+} from '../lib/googlefit.js';
 import { addWeightEntry, getWeightEntries } from '../lib/entries.js';
 import { isoDate } from '../lib/storage.js';
 
 export default function Weight({ settings, onChanged }) {
-  const token = getWithingsToken();
+  const token = getGoogleFitToken();
   const [status, setStatus] = useState(token ? 'Gekoppeld ✅' : 'Niet gekoppeld');
   const [error, setError] = useState('');
   const [manual, setManual] = useState({ date: isoDate(), kg: '' });
@@ -19,8 +20,8 @@ export default function Weight({ settings, onChanged }) {
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const state = params.get('state');
-    if (code && state === 'withings') {
-      exchangeCode(code, settings.withingsClientId, settings.withingsClientSecret, location.origin + '/?withings_connected=1')
+    if (code && state === 'googlefit') {
+      exchangeCode(code, settings.googleClientId, settings.googleClientSecret, location.origin + '/?weight_connected=1')
         .then(() => {
           setStatus('Gekoppeld ✅');
           history.replaceState(null, '', location.pathname);
@@ -30,26 +31,27 @@ export default function Weight({ settings, onChanged }) {
   }, []);
 
   function connect() {
-    if (!settings.withingsClientId) {
-      setError('Vul eerst je Withings Client ID in onder Instellingen.');
+    if (!settings.googleClientId) {
+      setError('Vul eerst je Google OAuth Client ID in onder Instellingen.');
       return;
     }
-    const url =
-      `https://account.withings.com/oauth2_user/authorize2?` +
-      `client_id=${settings.withingsClientId}` +
-      `&redirect_uri=${encodeURIComponent(location.origin + '/?withings_connected=1')}` +
-      `&scope=user.metrics&state=withings&response_type=code`;
-    location.href = url;
+    location.href = buildAuthUrl(settings.googleClientId, location.origin + '/?weight_connected=1');
   }
 
   async function sync() {
     setError('');
     setSyncing(true);
     try {
-      const grps = await fetchLatestMeasures(token);
-      const weights = measuresToWeights(grps);
-      weights.forEach((w) => addWeightEntry(isoDate(w.date), Number(w.kg.toFixed(2)), 'withings'));
-      setStatus(`Gekoppeld ✅ — ${weights.length} metingen opgehaald`);
+      const t = await getValidToken(settings.googleClientId, settings.googleClientSecret);
+      const endMs = Date.now();
+      const startMs = endMs - 90 * 86400000;
+      const weights = await fetchWeights(t, startMs, endMs);
+      weights.forEach((w) => addWeightEntry(isoDate(w.date), Number(w.kg.toFixed(2)), 'googlefit'));
+      setStatus(
+        weights.length
+          ? `Gekoppeld ✅ — ${weights.length} metingen (laatste 90 dagen) opgehaald`
+          : 'Gekoppeld ✅, maar geen gewichtsmetingen gevonden. Zet in de FITAGE-app "Google Fit / Health Connect" aan.'
+      );
       onChanged();
     } catch (e) {
       setError(e.message);
@@ -70,13 +72,18 @@ export default function Weight({ settings, onChanged }) {
   return (
     <section>
       <div className="card">
-        <h3>⚖️ Slimme weegschaal (Withings)</h3>
+        <h3>📶 Automatisch gewicht via Google Fit</h3>
+        <p className="muted">
+          De FITAGE-app heeft geen eigen API, maar synchroniseert naar Google Fit.
+          Zet in de FITAGE-app <b>Google Fit / Health Connect</b> aan, koppel hieronder je Google-account,
+          en je gewichtsmetingen worden automatisch opgehaald.
+        </p>
         <p className="muted">{status}</p>
         {error && <p className="error">{error}</p>}
         <div className="row">
-          {!token && <button className="primary" onClick={connect}>Koppel Withings</button>}
+          {!token && <button className="primary" onClick={connect}>Koppel Google Fit</button>}
           <button onClick={sync} disabled={syncing || !token}>
-            {syncing ? 'Synchroniseren…' : 'Metingen ophalen'}
+            {syncing ? 'Synchroniseren…' : 'Metingen ophalen (90 dagen)'}
           </button>
         </div>
       </div>
@@ -105,7 +112,7 @@ export default function Weight({ settings, onChanged }) {
           <ul className="list">
             {entries.map(([d, e]) => (
               <li key={d}>
-                <span>{d} {e.source === 'withings' ? '📶' : '✍️'}</span>
+                <span>{d} {e.source === 'googlefit' ? '📶' : '✍️'}</span>
                 <b>{e.kg.toFixed(1)} kg</b>
               </li>
             ))}

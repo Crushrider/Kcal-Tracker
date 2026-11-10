@@ -36,12 +36,12 @@ export default function Settings({ onSaved }) {
           <input type="password" value={form.stravaClientSecret} onChange={set('stravaClientSecret')} />
         </label>
 
-        <h4>Withings (slimme weegschaal)</h4>
+        <h4>Google Fit (gewicht via FITAGE-app)</h4>
         <label>Client ID
-          <input value={form.withingsClientId} onChange={set('withingsClientId')} />
+          <input value={form.googleClientId} onChange={set('googleClientId')} />
         </label>
-        <label>Client Secret
-          <input type="password" value={form.withingsClientSecret} onChange={set('withingsClientSecret')} />
+        <label>Client Secret (optioneel)
+          <input type="password" value={form.googleClientSecret} onChange={set('googleClientSecret')} />
         </label>
 
         <button className="primary" type="submit">Opslaan</button>

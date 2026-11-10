@@ -7,8 +7,8 @@ export const DEFAULT_SETTINGS = {
   dailyKcalTarget: 2200,
   stravaClientId: '',
   stravaClientSecret: '',
-  withingsClientId: '',
-  withingsClientSecret: ''
+  googleClientId: '',
+  googleClientSecret: ''
 };
 
 export function getSettings() {

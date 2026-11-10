@@ -27,7 +27,7 @@ export default function App() {
       setTab('strava');
       history.replaceState(null, '', location.pathname);
     }
-    if (params.get('withings_connected')) {
+    if (params.get('weight_connected')) {
       setTab('weight');
       history.replaceState(null, '', location.pathname);
     }
